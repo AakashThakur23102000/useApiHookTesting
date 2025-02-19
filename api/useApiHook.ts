@@ -2,11 +2,10 @@ import { useState, useEffect, useContext } from 'react';
 import { useApiHookContext } from '../context/UseApiHookContextStore';
 import { useApiHookThrottler } from '../utils/useApiHookThrottler';
 
-
 // Parameter interface 
 interface useApiHookInterface {
     apiCallingFunction: Function,
-    apiCallingFunctionQuery?: any[],
+    apiQuery?: any[],
     type?: "API" | "FORMDATA",
     apiPayload: any[],
     apiCustomReturnFunction: Function,
@@ -16,10 +15,19 @@ interface useApiHookInterface {
     throttleTime?: number[] | null,
 }
 
+interface useApiHookInterfaceRefetch {
+    refetchInitialLoadingState?: boolean,
+    refetchApiPayload?: any[],
+    refetchApiQuery?: any[],
+    refetchApiCustomReturnFunction?: Function | null,
+    refetchOnErrorReturnFunction?: Function | null
+}
+
+
 export const useApiHook = ({
     apiCallingFunction,
     type = "API",
-    apiCallingFunctionQuery = [],
+    apiQuery = [],
     apiPayload = [],
     runOnTimeOfScreenMount,
     initialLoadingState,
@@ -27,7 +35,7 @@ export const useApiHook = ({
     apiCustomReturnFunction,
     onErrorReturnFunction,
 }: useApiHookInterface) => {
-
+ 
     // context
     const useApiHookContextData = useContext(useApiHookContext) || null;
 
@@ -36,7 +44,7 @@ export const useApiHook = ({
     const [apiData, setApiData] = useState<null | any[]>(null);
     const [apiError, setApiError] = useState<null | any[] | string | Error>(null);
 
-
+    
     //some static values
     const fetchHeaders = {
         Accept: 'application/json',
@@ -52,16 +60,17 @@ export const useApiHook = ({
     // Function to call the API
     const apiFetching = async (
         refetchApiPayload?: any[],
+        refetchApiQuery?: any[],
         refetchApiCustomReturnFunction?: Function | null,
         refetchOnErrorReturnFunction?: Function | null
     ) => {
         if (type === "API") {
             try {
-                if (apiCallingFunctionQuery?.[0]) {
-                    var apiCallingFunctionQueryOld = apiCallingFunctionQuery[0]
-                    apiCallingFunctionQueryOld["contextData"] = useApiHookContextData;
+                const queryToUse = refetchApiQuery?.[0] || apiQuery?.[0];
+                if (queryToUse) {
+                    queryToUse["contextData"] = useApiHookContextData;
                 }
-                var apiCallingFunctionObj = await apiCallingFunction(apiCallingFunctionQueryOld || { contextData: useApiHookContextData });
+                var apiCallingFunctionObj = await apiCallingFunction(queryToUse || { contextData: useApiHookContextData });
 
                 var apiFetchingOptionsObj: any = {};
                 apiFetchingOptionsObj["method"] = apiCallingFunctionObj.method
@@ -141,8 +150,8 @@ export const useApiHook = ({
 
         } else {
             try {
-                if (apiCallingFunctionQuery?.[0]) {
-                    var apiCallingFunctionQueryOld = apiCallingFunctionQuery[0]
+                if (apiQuery?.[0]) {
+                    var apiCallingFunctionQueryOld = apiQuery[0]
                     apiCallingFunctionQueryOld["contextData"] = useApiHookContextData;
                 }
                 var apiCallingFunctionObj = await apiCallingFunction(apiCallingFunctionQueryOld || { contextData: useApiHookContextData });
@@ -247,10 +256,13 @@ export const useApiHook = ({
     };
 
     const refetchingApiFunction = async (
-        refetchInitialLoadingState?: boolean,
-        refetchApiPayload: any[] = apiPayload,
-        refetchApiCustomReturnFunction?: Function | null,
-        refetchOnErrorReturnFunction?: Function | null
+        {
+            refetchInitialLoadingState = initialLoadingState,
+            refetchApiPayload = apiPayload,
+            refetchApiQuery = apiQuery,
+            refetchApiCustomReturnFunction = apiCustomReturnFunction,
+            refetchOnErrorReturnFunction = onErrorReturnFunction
+        }: useApiHookInterfaceRefetch = {}
     ) => {
         const isThrottled = useApiHookThrottler(
             apiCallingFunction.name,
@@ -267,7 +279,7 @@ export const useApiHook = ({
                 }
             }
 
-            await apiFetching(refetchApiPayload, refetchApiCustomReturnFunction, refetchOnErrorReturnFunction);
+            await apiFetching(refetchApiPayload, refetchApiQuery, refetchApiCustomReturnFunction, refetchOnErrorReturnFunction);
         }
     }
 
